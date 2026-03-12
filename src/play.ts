@@ -14,19 +14,19 @@ export async function play(audio: Buffer, sourceFormat: string): Promise<void> {
   const shouldSave = preferences.saveAudioFiles || false;
   const desiredOutputFormat = preferences.outputFormat || sourceFormat;
   const desiredSpeed = parseSpeed(preferences.speed);
-  let outputFormat = desiredOutputFormat;
+  let outputFormat: string = desiredOutputFormat;
   let speed = desiredSpeed;
   let needsTranscode = outputFormat !== sourceFormat || speed !== 1;
 
-  const audioDir = join(homedir(), ".cache", "raycast-pocket-tts");
+  const audioDir = join(homedir(), ".cache", "raycast-tts");
   if (shouldSave) {
     await mkdir(audioDir, { recursive: true });
   }
 
   const inputIsTemporary = !shouldSave || needsTranscode;
   const inputPath = inputIsTemporary
-    ? join(tmpdir(), `pocket-tts-${Date.now()}.${sourceFormat}`)
-    : join(audioDir, `pocket-tts-${Date.now()}.${sourceFormat}`);
+    ? join(tmpdir(), `tts-${Date.now()}.${sourceFormat}`)
+    : join(audioDir, `tts-${Date.now()}.${sourceFormat}`);
 
   await writeFile(inputPath, audio);
 
@@ -43,8 +43,8 @@ export async function play(audio: Buffer, sourceFormat: string): Promise<void> {
 
   if (needsTranscode) {
     const outputPath = shouldSave
-      ? join(audioDir, `pocket-tts-${Date.now()}.${outputFormat}`)
-      : join(tmpdir(), `pocket-tts-${Date.now()}.${outputFormat}`);
+      ? join(audioDir, `tts-${Date.now()}.${outputFormat}`)
+      : join(tmpdir(), `tts-${Date.now()}.${outputFormat}`);
 
     await transcodeAudio(inputPath, outputPath, speed);
 
@@ -152,7 +152,7 @@ function buildAtempoFilter(speed: number): string | null {
     filters.push(remaining);
   }
 
-  return filters.map((value) => `atempo=${value.toFixed(3)}`).join(",");
+  return filters.length > 0 ? filters.map((value) => `atempo=${value.toFixed(3)}`).join(",") : null;
 }
 
 async function playWithAfplay(filePath: string): Promise<void> {

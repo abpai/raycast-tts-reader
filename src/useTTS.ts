@@ -10,7 +10,7 @@ export function useTTS() {
   const error = useMemo(() => {
     const message = getConfigError(preferences);
     return message ? new Error(message) : undefined;
-  }, [preferences.mode, preferences.serverUrl]);
+  }, [preferences.serverUrl]);
 
   const speak = async (text: string) => {
     setIsLoading(true);

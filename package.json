@@ -1,9 +1,9 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "pocket-reader",
-  "version": "1.0.0",
-  "title": "Pocket Reader",
-  "description": "Text to speech powered by Kyutai Pocket TTS",
+  "name": "tts-reader",
+  "version": "2.0.0",
+  "title": "TTS Reader",
+  "description": "Text-to-speech reader powered by any TTS provider",
   "icon": "extension-icon.png",
   "author": "andypai",
   "license": "MIT",
@@ -13,11 +13,11 @@
     "Media"
   ],
   "keywords": [
-    "pocket-tts",
-    "kyutai",
     "tts",
     "text to speech",
-    "voice"
+    "voice",
+    "speech",
+    "reader"
   ],
   "commands": [
     {
@@ -35,34 +35,16 @@
     {
       "name": "onboarding",
       "title": "Get Started",
-      "description": "Onboarding and configuration for Pocket TTS.",
+      "description": "Onboarding and configuration for TTS Reader.",
       "mode": "view"
     }
   ],
   "preferences": [
     {
-      "name": "mode",
-      "type": "dropdown",
-      "title": "Mode",
-      "description": "Choose between using a running Pocket TTS server or invoking the CLI.",
-      "defaultValue": "serve",
-      "required": true,
-      "data": [
-        {
-          "value": "serve",
-          "title": "Serve (HTTP server)"
-        },
-        {
-          "value": "generate",
-          "title": "Generate (CLI)"
-        }
-      ]
-    },
-    {
       "name": "serverUrl",
       "type": "textfield",
       "title": "Server URL",
-      "description": "Pocket TTS serve endpoint URL (typically http://localhost:8000).",
+      "description": "TTS server endpoint URL (typically http://localhost:8000).",
       "defaultValue": "http://localhost:8000",
       "required": false
     },
@@ -70,8 +52,8 @@
       "name": "voice",
       "type": "textfield",
       "title": "Voice",
-      "description": "Voice name or URL/path (e.g., alba, hf://.../casual.wav, https://..., /path/to/voice.wav).",
-      "defaultValue": "alba",
+      "description": "Voice name to use for speech synthesis.",
+      "defaultValue": "",
       "required": false
     },
     {
@@ -109,66 +91,10 @@
       ]
     },
     {
-      "name": "variant",
-      "type": "textfield",
-      "title": "Variant (generate mode)",
-      "description": "Model variant/signature for generate mode.",
-      "defaultValue": "b6369a24",
-      "required": false
-    },
-    {
-      "name": "lsdDecodeSteps",
-      "type": "textfield",
-      "title": "LSD Decode Steps (generate mode)",
-      "description": "Number of decode steps for generate mode.",
-      "defaultValue": "1",
-      "required": false
-    },
-    {
-      "name": "temperature",
-      "type": "textfield",
-      "title": "Temperature (generate mode)",
-      "description": "Sampling temperature for generate mode.",
-      "defaultValue": "0.7",
-      "required": false
-    },
-    {
-      "name": "noiseClamp",
-      "type": "textfield",
-      "title": "Noise Clamp (generate mode)",
-      "description": "Noise clamp for generate mode (leave empty to use default).",
-      "defaultValue": "",
-      "required": false
-    },
-    {
-      "name": "eosThreshold",
-      "type": "textfield",
-      "title": "EOS Threshold (generate mode)",
-      "description": "End-of-sequence threshold for generate mode.",
-      "defaultValue": "-4.0",
-      "required": false
-    },
-    {
-      "name": "framesAfterEos",
-      "type": "textfield",
-      "title": "Frames After EOS (generate mode)",
-      "description": "Number of frames to generate after EOS (leave empty for auto).",
-      "defaultValue": "",
-      "required": false
-    },
-    {
-      "name": "device",
-      "type": "textfield",
-      "title": "Device (generate mode)",
-      "description": "Device for generate mode (e.g., cpu, cuda).",
-      "defaultValue": "cpu",
-      "required": false
-    },
-    {
       "name": "saveAudioFiles",
       "type": "checkbox",
       "title": "Save Audio Files",
-      "description": "Save generated audio files to ~/.cache/raycast-pocket-tts/ for debugging and reuse.",
+      "description": "Save generated audio files to ~/.cache/raycast-tts/ for debugging and reuse.",
       "defaultValue": false,
       "required": false,
       "label": "Save Audio Files"

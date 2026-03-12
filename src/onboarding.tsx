@@ -2,19 +2,19 @@ import { Action, ActionPanel, Detail, openExtensionPreferences } from "@raycast/
 
 export default function Onboarding() {
   const markdown = `
-  # Configuration ⚙️
+  # Configuration
 
-  This extension works with Kyutai Pocket TTS and supports two modes:
+  This extension reads text aloud using any TTS server that accepts \`POST /tts\` with a \`text\` form field. See [tts-gateway](https://github.com/abpai/tts-gateway) for a reference implementation.
 
-  **Serve mode (recommended)**
-  1. Install Pocket TTS and run \`pocket-tts serve\` (or \`uvx pocket-tts serve\`).
-  2. Press \`⏎\` to open the extension preferences.
-  3. Set "Mode" to **serve** and confirm the server URL (default: \`http://localhost:8000\`).
+  **Recommended example: tts-gateway**
+  1. Install: \`uv tool install tts-gateway[kokoro]\`
+  2. Start the server: \`tts serve --provider kokoro\`
+  3. Press \`⏎\` to open preferences and confirm the server URL (default: \`http://localhost:8000\`).
 
-  **Generate mode**
-  1. Install Pocket TTS and ensure \`pocket-tts\` is available on your PATH.
-  2. Press \`⏎\` to open the extension preferences.
-  3. Set "Mode" to **generate** and adjust voice/parameters as needed.
+  **Using another TTS server**
+  1. Start your TTS server.
+  2. Press \`⏎\` to open preferences.
+  3. Set the "Server URL" to your server's endpoint.
   `;
 
   return (
