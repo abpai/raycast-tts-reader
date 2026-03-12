@@ -13,6 +13,8 @@
 
 ## Patterns That Work
 
+- For validation in this repo, use `pnpm lint` and `pnpm exec tsc --noEmit`; `npm` is not available in the local environment.
+- In this Raycast extension, shared "selected text or clipboard fallback" logic is worth keeping in a small helper so command files stay focused on command flow and user messaging.
 - Start rename sweeps with a repo-wide `rg` search for historical project names, then audit package metadata and onboarding copy separately.
 - For release-prep sweeps, verify `package.json` version, changelog version/date, and the git remote slug together so the rename does not ship half-finished.
 - When adding user-facing setup links, verify the target GitHub slug directly with `git ls-remote` so README, changelog, and onboarding stay aligned.
