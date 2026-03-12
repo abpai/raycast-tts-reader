@@ -12,10 +12,8 @@ let ffmpegAvailableCache: boolean | null = null;
 export async function play(audio: Buffer, sourceFormat: string): Promise<void> {
   const preferences = getPreferenceValues<Preferences>();
   const shouldSave = preferences.saveAudioFiles || false;
-  const desiredOutputFormat = preferences.outputFormat || sourceFormat;
-  const desiredSpeed = parseSpeed(preferences.speed);
-  let outputFormat: string = desiredOutputFormat;
-  let speed = desiredSpeed;
+  let outputFormat: string = preferences.outputFormat || sourceFormat;
+  let speed = parseSpeed(preferences.speed);
   let needsTranscode = outputFormat !== sourceFormat || speed !== 1;
 
   const audioDir = join(homedir(), ".cache", "raycast-tts");
@@ -24,9 +22,11 @@ export async function play(audio: Buffer, sourceFormat: string): Promise<void> {
   }
 
   const inputIsTemporary = !shouldSave || needsTranscode;
-  const inputPath = inputIsTemporary
-    ? join(tmpdir(), `tts-${Date.now()}.${sourceFormat}`)
-    : join(audioDir, `tts-${Date.now()}.${sourceFormat}`);
+  const inputPath = createAudioPath({
+    audioDir,
+    extension: sourceFormat,
+    useTemporaryDirectory: inputIsTemporary,
+  });
 
   await writeFile(inputPath, audio);
 
@@ -42,9 +42,11 @@ export async function play(audio: Buffer, sourceFormat: string): Promise<void> {
   }
 
   if (needsTranscode) {
-    const outputPath = shouldSave
-      ? join(audioDir, `tts-${Date.now()}.${outputFormat}`)
-      : join(tmpdir(), `tts-${Date.now()}.${outputFormat}`);
+    const outputPath = createAudioPath({
+      audioDir,
+      extension: outputFormat,
+      useTemporaryDirectory: !shouldSave,
+    });
 
     await transcodeAudio(inputPath, outputPath, speed);
 
@@ -62,6 +64,19 @@ export async function play(audio: Buffer, sourceFormat: string): Promise<void> {
       scheduleCleanup(playPath);
     }
   }
+}
+
+function createAudioPath({
+  audioDir,
+  extension,
+  useTemporaryDirectory,
+}: {
+  audioDir: string;
+  extension: string;
+  useTemporaryDirectory: boolean;
+}): string {
+  const directory = useTemporaryDirectory ? tmpdir() : audioDir;
+  return join(directory, `tts-${Date.now()}.${extension}`);
 }
 
 function parseSpeed(value?: string): number {
