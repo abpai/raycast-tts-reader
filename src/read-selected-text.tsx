@@ -1,5 +1,6 @@
-import { Clipboard, closeMainWindow, getPreferenceValues, getSelectedText, showToast, Toast } from "@raycast/api";
+import { closeMainWindow, getPreferenceValues, showToast, Toast } from "@raycast/api";
 import { play } from "./play";
+import { getSelectedTextOrClipboard } from "./text-source";
 import { createSpeech, getConfigError } from "./tts-utils";
 import { Preferences } from "./types";
 
@@ -16,13 +17,7 @@ export default async function Command() {
     return;
   }
 
-  let text: string;
-  try {
-    text = await getSelectedText();
-  } catch {
-    const clipboardText = await Clipboard.readText();
-    text = clipboardText ?? "";
-  }
+  const text = await getSelectedTextOrClipboard();
 
   if (!text.trim()) {
     await showToast({

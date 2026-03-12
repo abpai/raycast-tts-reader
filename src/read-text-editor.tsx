@@ -1,6 +1,7 @@
-import { Action, ActionPanel, Clipboard, Form, getSelectedText, showToast, Toast, useNavigation } from "@raycast/api";
+import { Action, ActionPanel, Form, showToast, Toast, useNavigation } from "@raycast/api";
 import { useEffect, useState } from "react";
 import { play } from "./play";
+import { getSelectedTextOrClipboard } from "./text-source";
 import { useTTS } from "./useTTS";
 
 export default function Command() {
@@ -12,11 +13,7 @@ export default function Command() {
   useEffect(() => {
     async function fetchText() {
       try {
-        const selectedText = await getSelectedText();
-        setText(selectedText);
-      } catch {
-        const clipboardText = (await Clipboard.readText()) ?? "";
-        setText(clipboardText);
+        setText(await getSelectedTextOrClipboard());
       } finally {
         setIsInitializing(false);
       }
