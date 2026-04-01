@@ -9,7 +9,10 @@ import { Preferences } from "./types";
 const cleanupTimeouts = new Set<NodeJS.Timeout>();
 let ffmpegAvailableCache: boolean | null = null;
 
-export async function play(audio: Buffer, sourceFormat: string): Promise<void> {
+export type PlayResult = { warnings: string[] };
+
+export async function play(audio: Buffer, sourceFormat: string): Promise<PlayResult> {
+  const warnings: string[] = [];
   const preferences = getPreferenceValues<Preferences>();
   const shouldSave = preferences.saveAudioFiles || false;
   let outputFormat: string = preferences.outputFormat || sourceFormat;
@@ -37,7 +40,7 @@ export async function play(audio: Buffer, sourceFormat: string): Promise<void> {
       outputFormat = sourceFormat;
       speed = 1;
       needsTranscode = false;
-      console.log("ffmpeg not available; falling back to default speed/format.");
+      warnings.push("ffmpeg not found — playing at original speed and format");
     }
   }
 
@@ -64,6 +67,8 @@ export async function play(audio: Buffer, sourceFormat: string): Promise<void> {
       scheduleCleanup(playPath);
     }
   }
+
+  return { warnings };
 }
 
 function createAudioPath({

@@ -13,7 +13,11 @@ export default function Command() {
   useEffect(() => {
     async function fetchText() {
       try {
-        setText(await getSelectedTextOrClipboard());
+        const { text: fetched, source } = await getSelectedTextOrClipboard();
+        setText(fetched);
+        if (source === "clipboard" && fetched.trim()) {
+          showToast({ style: Toast.Style.Success, title: "Loaded clipboard text" });
+        }
       } finally {
         setIsInitializing(false);
       }
@@ -51,11 +55,12 @@ export default function Command() {
     }
 
     try {
-      const { audio, format } = await speak(text);
-      await play(audio, format);
+      const { audio, format, engine } = await speak(text);
+      const { warnings } = await play(audio, format);
       await showToast({
         style: Toast.Style.Success,
-        title: "Finished speaking",
+        title: engine ? `Finished speaking (${engine})` : "Finished speaking",
+        message: warnings.length > 0 ? warnings.join("; ") : undefined,
       });
       pop();
     } catch (err) {

@@ -17,7 +17,7 @@ export default async function Command() {
     return;
   }
 
-  const text = await getSelectedTextOrClipboard();
+  const { text, source } = await getSelectedTextOrClipboard();
 
   if (!text.trim()) {
     await showToast({
@@ -31,16 +31,18 @@ export default async function Command() {
   const toast = await showToast({
     style: Toast.Style.Animated,
     title: "Generating speech…",
+    message: source === "clipboard" ? "Using clipboard text" : undefined,
   });
 
   try {
     await closeMainWindow();
 
-    const { audio, format } = await createSpeech(text);
-    await play(audio, format);
+    const { audio, format, engine } = await createSpeech(text);
+    const { warnings } = await play(audio, format);
 
     toast.style = Toast.Style.Success;
-    toast.title = "Finished reading";
+    toast.title = engine ? `Finished reading (${engine})` : "Finished reading";
+    toast.message = warnings.length > 0 ? warnings.join("; ") : undefined;
   } catch (err) {
     toast.style = Toast.Style.Failure;
     toast.title = "Failed to generate speech";

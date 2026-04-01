@@ -4,15 +4,19 @@ import { Preferences } from "./types";
 export type SpeechResult = {
   audio: Buffer;
   format: string;
+  engine?: string;
 };
 
 const DEFAULT_SERVER_URL = "http://localhost:8000";
+const HEALTH_TIMEOUT_MS = 2000;
+
+let gatewayCache: { baseUrl: string; isGateway: boolean } | null = null;
 
 export function getConfigError(preferences: Preferences): string | null {
   const serverUrl = preferences.serverUrl?.trim();
   if (serverUrl) {
     try {
-      normalizeServerUrl(serverUrl);
+      parseServerUrl(serverUrl);
     } catch {
       return "Invalid TTS server URL";
     }
@@ -27,7 +31,9 @@ export async function createSpeech(text: string): Promise<SpeechResult> {
     throw new Error(configError);
   }
 
-  const serverUrl = normalizeServerUrl(preferences.serverUrl ?? DEFAULT_SERVER_URL);
+  const { baseUrl, hasCustomPath, fullUrl } = parseServerUrl(preferences.serverUrl ?? DEFAULT_SERVER_URL);
+  const isGateway = hasCustomPath ? false : await detectGateway(baseUrl);
+  const speechUrl = hasCustomPath ? fullUrl : isGateway ? `${baseUrl}/v1/speech` : `${baseUrl}/tts`;
   const voice = preferences.voice?.trim();
 
   const formData = new FormData();
@@ -36,24 +42,23 @@ export async function createSpeech(text: string): Promise<SpeechResult> {
     formData.append("voice", voice);
   }
 
-  const response = await fetch(serverUrl, {
+  const response = await fetch(speechUrl, {
     method: "POST",
     body: formData,
   });
 
   if (!response.ok) {
-    const message = await readErrorMessage(response);
-    const details = message ? `: ${message}` : "";
-    throw new Error(`TTS server error (${response.status})${details}`);
+    throw new Error(isGateway ? gatewayErrorMessage(response.status) : await genericErrorMessage(response));
   }
 
   const contentType = response.headers.get("content-type") || "audio/wav";
   const format = parseAudioFormat(contentType);
+  const engine = response.headers.get("x-tts-primary-engine") || undefined;
   const audioBuffer = await response.arrayBuffer();
-  return { audio: Buffer.from(audioBuffer), format };
+  return { audio: Buffer.from(audioBuffer), format, engine };
 }
 
-function normalizeServerUrl(rawUrl: string): string {
+function parseServerUrl(rawUrl: string): { baseUrl: string; hasCustomPath: boolean; fullUrl: string } {
   const trimmed = rawUrl.trim() || DEFAULT_SERVER_URL;
 
   let url: URL;
@@ -63,11 +68,52 @@ function normalizeServerUrl(rawUrl: string): string {
     throw new Error("Invalid TTS server URL");
   }
 
-  if (!url.pathname || url.pathname === "/") {
-    url.pathname = "/tts";
+  const baseUrl = `${url.protocol}//${url.host}`;
+  const hasCustomPath = url.pathname !== "/" && url.pathname !== "";
+  return { baseUrl, hasCustomPath, fullUrl: url.toString() };
+}
+
+async function detectGateway(baseUrl: string): Promise<boolean> {
+  if (gatewayCache && gatewayCache.baseUrl === baseUrl) {
+    return gatewayCache.isGateway;
   }
 
-  return url.toString();
+  let isGateway = false;
+  try {
+    const response = await fetch(`${baseUrl}/health`, {
+      signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+    });
+    if (response.ok) {
+      const body = (await response.json()) as { ok?: boolean; primaryEngine?: string };
+      isGateway = body?.ok === true && typeof body?.primaryEngine === "string";
+    }
+  } catch {
+    // Health probe failed — not a gateway or server unreachable
+  }
+
+  gatewayCache = { baseUrl, isGateway };
+  return isGateway;
+}
+
+function gatewayErrorMessage(status: number): string {
+  switch (status) {
+    case 422:
+      return "Text was empty";
+    case 502:
+      return "TTS engine error";
+    case 503:
+      return "No TTS engines available — check server configuration";
+    case 504:
+      return "Speech generation timed out — try shorter text";
+    default:
+      return `TTS server error (${status})`;
+  }
+}
+
+async function genericErrorMessage(response: Response): Promise<string> {
+  const message = await readErrorBody(response);
+  const details = message ? `: ${message}` : "";
+  return `TTS server error (${response.status})${details}`;
 }
 
 function parseAudioFormat(contentType: string): string {
@@ -79,10 +125,10 @@ function parseAudioFormat(contentType: string): string {
   return "wav";
 }
 
-async function readErrorMessage(response: { text: () => Promise<string> }): Promise<string | null> {
+async function readErrorBody(response: { text: () => Promise<string> }): Promise<string | null> {
   try {
     const text = await response.text();
-    return text.trim() ? text.trim() : null;
+    return text.trim() || null;
   } catch {
     return null;
   }
