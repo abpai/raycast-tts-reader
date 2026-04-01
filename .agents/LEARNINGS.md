@@ -5,6 +5,7 @@
 | Date | Source | What Went Wrong | What To Do Instead |
 | ---- | ------ | --------------- | ------------------ |
 | 2026-03-11 | self | Assumed `.agents/LEARNINGS.md` already existed in this repo | Create the project memory file at task start when it is missing, before continuing with repo changes |
+| 2026-04-01 | self | Read project memory from the current workspace before checking the repo being audited | For cross-repo work, read the target repo's `.agents/LEARNINGS.md` before reviewing files or behavior |
 
 ## User Preferences
 
