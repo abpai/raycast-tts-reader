@@ -1,5 +1,22 @@
 # TTS Reader Changelog
 
+## [2.1.0] - 2026-04-01
+
+**Gateway-aware transport and improved feedback.**
+
+### Added
+
+- Auto-detect tts-gateway servers via `/health` probe and route requests to `/v1/speech`
+- Show TTS engine name in success toast when available
+- Show clipboard fallback notice when no text is selected
+- Show warning when ffmpeg is unavailable and speed/format preferences are set
+- Added ffmpeg documentation to onboarding screen
+
+### Changed
+
+- Custom endpoint paths (e.g., `http://host/api/tts`) are preserved and used as-is
+- Gateway-specific error messages for 422, 502, 503, and 504 status codes
+
 ## [2.0.0] - 2026-03-11
 
 **Renamed and rewritten for provider-agnostic TTS.**

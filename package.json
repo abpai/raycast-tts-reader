@@ -1,7 +1,7 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "tts-reader",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "title": "TTS Reader",
   "description": "Text-to-speech reader powered by any TTS provider",
   "icon": "extension-icon.png",
