@@ -4,9 +4,9 @@ export default function Onboarding() {
   const markdown = `
   # Configuration
 
-  This extension reads text aloud using any TTS server that accepts \`POST /tts\` with a \`text\` form field. See [tts-gateway](https://github.com/abpai/tts-gateway) for a reference implementation.
+  This extension reads text aloud using a local TTS server. It auto-detects [tts-gateway](https://github.com/abpai/tts-gateway) servers and uses their optimized \`/v1/speech\` endpoint. Any server that accepts \`POST /tts\` with a \`text\` form field also works.
 
-  **Recommended example: tts-gateway**
+  **Recommended: tts-gateway**
   1. Install: \`uv tool install tts-gateway[kokoro]\`
   2. Start the server: \`tts serve --provider kokoro\`
   3. Press \`⏎\` to open preferences and confirm the server URL (default: \`http://localhost:8000\`).
@@ -15,6 +15,10 @@ export default function Onboarding() {
   1. Start your TTS server.
   2. Press \`⏎\` to open preferences.
   3. Set the "Server URL" to your server's endpoint.
+
+  **Optional: ffmpeg**
+
+  Install \`ffmpeg\` to enable playback speed adjustment and audio format conversion. Without it, audio plays at the original speed and format returned by the server.
   `;
 
   return (
