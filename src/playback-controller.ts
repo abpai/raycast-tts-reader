@@ -2,26 +2,50 @@ import { mkdir, readFile, rename, rm, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
 import { spawn } from "child_process";
+import { ensureToolingInPath } from "./path-utils";
 
 export type PlaybackState = {
   pid: number;
   filePath: string;
-  player: "afplay";
+  player: "afplay" | "ffplay";
+  status?: "playing" | "stopping";
 };
 
 const audioDir = join(homedir(), ".cache", "raycast-tts");
 const playbackStatePath = join(audioDir, "playback-state.json");
+const systemPsPath = "/bin/ps";
+const spawnEnv = { ...process.env, PATH: ensureToolingInPath() };
+let preferredPlayerCache: PlaybackState["player"] | null = null;
 
 export async function startPlayback(filePath: string): Promise<"finished" | "stopped"> {
   await stopPlayback().catch(() => false);
 
+  const preferredPlayer = await getPreferredPlayer();
+
+  try {
+    return await startPlaybackWithPlayer(filePath, preferredPlayer);
+  } catch (error) {
+    if (preferredPlayer === "ffplay" && shouldFallbackToAfplay(error)) {
+      return await startPlaybackWithPlayer(filePath, "afplay");
+    }
+    throw error;
+  }
+}
+
+async function startPlaybackWithPlayer(
+  filePath: string,
+  player: PlaybackState["player"],
+): Promise<"finished" | "stopped"> {
   return await new Promise<"finished" | "stopped">((resolve, reject) => {
-    const afplay = spawn("afplay", ["-v", "1.0", filePath]);
-    const pid = afplay.pid;
+    const playbackProcess = spawn(player, getPlaybackArgs(player, filePath), {
+      env: spawnEnv,
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    const pid = playbackProcess.pid;
 
     if (!pid) {
-      afplay.kill("SIGTERM");
-      reject(new Error("afplay did not return a process id"));
+      playbackProcess.kill("SIGTERM");
+      reject(new Error(`${player} did not return a process id`));
       return;
     }
 
@@ -29,13 +53,13 @@ export async function startPlayback(filePath: string): Promise<"finished" | "sto
     let settled = false;
     let statePersisted = false;
 
-    const stateWrite = writePlaybackState({ pid, filePath, player: "afplay" })
+    const stateWrite = writePlaybackState({ pid, filePath, player, status: "playing" })
       .then(() => {
         statePersisted = true;
       })
       .catch(async (err) => {
         try {
-          afplay.kill("SIGTERM");
+          playbackProcess.kill("SIGTERM");
         } catch {
           // If the player already exited, the close/error handler will resolve the real outcome.
         }
@@ -57,31 +81,42 @@ export async function startPlayback(filePath: string): Promise<"finished" | "sto
         .finally(handler);
     };
 
-    afplay.stderr.on("data", (data) => {
+    playbackProcess.stderr.on("data", (data) => {
       errorOutput += data.toString();
     });
 
-    afplay.on("close", (code, signal) => {
-      settle(() => {
-        if (code === 0) {
-          resolve("finished");
-          return;
-        }
+    playbackProcess.on("close", (code, signal) => {
+      void readPlaybackState()
+        .catch(() => null)
+        .then((state) => {
+          const wasStopped = state?.pid === pid && state.status === "stopping";
 
-        if (signal === "SIGTERM" || signal === "SIGKILL") {
-          resolve("stopped");
-          return;
-        }
+          settle(() => {
+            if (wasStopped) {
+              resolve("stopped");
+              return;
+            }
 
-        const errorMessage = `afplay exited with code ${code}`;
-        const detailedError = errorOutput ? `${errorMessage}: ${errorOutput}` : errorMessage;
-        reject(new Error(detailedError));
-      });
+            if (code === 0) {
+              resolve("finished");
+              return;
+            }
+
+            if (signal === "SIGTERM" || signal === "SIGKILL") {
+              resolve("stopped");
+              return;
+            }
+
+            const errorMessage = `${player} exited with code ${code}`;
+            const detailedError = errorOutput ? `${errorMessage}: ${errorOutput}` : errorMessage;
+            reject(new Error(detailedError));
+          });
+        });
     });
 
-    afplay.on("error", (err) => {
+    playbackProcess.on("error", (err) => {
       settle(() => {
-        reject(new Error(`afplay process error: ${err.message}`));
+        reject(new Error(`${player} process error: ${err.message}`));
       });
     });
 
@@ -104,8 +139,8 @@ export async function stopPlayback(): Promise<boolean> {
     return false;
   }
 
+  await writePlaybackState({ ...state, status: "stopping" });
   await stopProcess(state.pid);
-  await clearPlaybackState(state.pid);
   return true;
 }
 
@@ -152,7 +187,12 @@ async function readPlaybackState(): Promise<PlaybackState | null> {
     const raw = await readFile(playbackStatePath, "utf8");
     const parsed = JSON.parse(raw) as Partial<PlaybackState>;
 
-    if (typeof parsed.pid !== "number" || typeof parsed.filePath !== "string" || parsed.player !== "afplay") {
+    if (
+      typeof parsed.pid !== "number" ||
+      typeof parsed.filePath !== "string" ||
+      (parsed.player !== "afplay" && parsed.player !== "ffplay") ||
+      (parsed.status !== undefined && parsed.status !== "playing" && parsed.status !== "stopping")
+    ) {
       await rm(playbackStatePath, { force: true });
       return null;
     }
@@ -208,7 +248,8 @@ function isMissingFileError(error: unknown): boolean {
 
 async function readProcessCommand(pid: number): Promise<string | null> {
   const result = await new Promise<string | null>((resolve, reject) => {
-    const child = spawn("ps", ["-p", String(pid), "-o", "comm="], {
+    const child = spawn(systemPsPath, ["-p", String(pid), "-o", "comm="], {
+      env: spawnEnv,
       stdio: ["ignore", "pipe", "ignore"],
     });
 
@@ -236,4 +277,37 @@ function isUnavailableProcessError(error: unknown): boolean {
   return Boolean(
     error && typeof error === "object" && "code" in error && (error.code === "ESRCH" || error.code === "EPERM"),
   );
+}
+
+async function getPreferredPlayer(): Promise<PlaybackState["player"]> {
+  if (preferredPlayerCache) {
+    return preferredPlayerCache;
+  }
+
+  preferredPlayerCache = (await isCommandAvailable("ffplay")) ? "ffplay" : "afplay";
+  return preferredPlayerCache;
+}
+
+async function isCommandAvailable(command: string): Promise<boolean> {
+  return await new Promise<boolean>((resolve) => {
+    const child = spawn(command, ["-version"], {
+      env: spawnEnv,
+      stdio: "ignore",
+    });
+
+    child.on("close", (code) => resolve(code === 0));
+    child.on("error", () => resolve(false));
+  });
+}
+
+function getPlaybackArgs(player: PlaybackState["player"], filePath: string): string[] {
+  if (player === "ffplay") {
+    return ["-nodisp", "-autoexit", "-loglevel", "error", filePath];
+  }
+
+  return ["-v", "1.0", filePath];
+}
+
+function shouldFallbackToAfplay(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("ffplay");
 }

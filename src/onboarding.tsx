@@ -20,6 +20,8 @@ export default function Onboarding() {
 
   Install \`ffmpeg\` to enable playback speed adjustment and audio format conversion. Without it, audio plays at the original speed and format returned by the server.
 
+  Install \`ffplay\` if you want playback to prefer FFmpeg's player instead of macOS \`afplay\`.
+
   **Playback controls**
 
   Add a hotkey for **Stop Audio** if you want quick control after speech starts.

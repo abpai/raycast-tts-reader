@@ -3,6 +3,8 @@ import { join } from "path";
 
 export function ensureToolingInPath(currentPath: string = process.env.PATH || ""): string {
   const requiredPaths = [
+    "/usr/bin",
+    "/bin",
     "/usr/local/bin",
     "/opt/homebrew/bin",
     join(homedir(), ".local", "bin"),

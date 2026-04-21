@@ -9,6 +9,7 @@
 ### Changed
 
 - Playback now runs through a shared controller so one command can stop audio started by another command
+- Playback now prefers `ffplay` when it is available and falls back to macOS `afplay`
 
 ## [2.1.0] - 2026-04-01
 

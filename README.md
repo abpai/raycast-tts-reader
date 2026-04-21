@@ -58,6 +58,7 @@ Any server that accepts `POST /tts` with a `text` form field and returns audio w
 **Optional (speed/format)**
 
 * Install `ffmpeg` if you want non-WAV output or playback speed changes.
+* Install `ffplay` if you want the extension to prefer FFmpeg's playback engine instead of macOS `afplay`.
 
 ---
 
@@ -119,7 +120,7 @@ All changes are saved automatically and take effect immediately.
 * By default, audio files are temporary and cleaned up after playback.
 * Enable "Save Audio Files" to keep them in `~/.cache/raycast-tts/`.
 * File extensions match your selected format.
-* Playback uses macOS's built-in `afplay`.
+* Playback prefers `ffplay` when available and falls back to macOS `afplay`.
 
 ---
 
