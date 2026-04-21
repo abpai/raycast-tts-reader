@@ -4,6 +4,14 @@ import { getSelectedTextOrClipboard } from "./text-source";
 import { createSpeech, getConfigError } from "./tts-utils";
 import { Preferences } from "./types";
 
+function getCompletionTitle(completion: "finished" | "stopped", engine?: string): string {
+  if (completion === "stopped") {
+    return engine ? `Reading interrupted (${engine})` : "Reading interrupted";
+  }
+
+  return engine ? `Finished reading (${engine})` : "Finished reading";
+}
+
 export default async function Command() {
   const preferences = getPreferenceValues<Preferences>();
 
@@ -38,10 +46,10 @@ export default async function Command() {
     await closeMainWindow();
 
     const { audio, format, engine } = await createSpeech(text);
-    const { warnings } = await play(audio, format);
+    const { warnings, completion } = await play(audio, format);
 
     toast.style = Toast.Style.Success;
-    toast.title = engine ? `Finished reading (${engine})` : "Finished reading";
+    toast.title = getCompletionTitle(completion, engine);
     toast.message = warnings.length > 0 ? warnings.join("; ") : undefined;
   } catch (err) {
     toast.style = Toast.Style.Failure;

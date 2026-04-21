@@ -19,6 +19,10 @@ export default function Onboarding() {
   **Optional: ffmpeg**
 
   Install \`ffmpeg\` to enable playback speed adjustment and audio format conversion. Without it, audio plays at the original speed and format returned by the server.
+
+  **Playback controls**
+
+  Add a hotkey for **Stop Audio** if you want quick control after speech starts.
   `;
 
   return (

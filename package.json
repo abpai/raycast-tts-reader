@@ -33,6 +33,12 @@
       "mode": "view"
     },
     {
+      "name": "stop-audio",
+      "title": "Stop Audio",
+      "description": "Immediately stop the current audio playback.",
+      "mode": "no-view"
+    },
+    {
       "name": "onboarding",
       "title": "Get Started",
       "description": "Onboarding and configuration for TTS Reader.",

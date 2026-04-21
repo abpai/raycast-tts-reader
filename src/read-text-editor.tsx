@@ -4,6 +4,14 @@ import { play } from "./play";
 import { getSelectedTextOrClipboard } from "./text-source";
 import { useTTS } from "./useTTS";
 
+function getCompletionTitle(completion: "finished" | "stopped", engine?: string): string {
+  if (completion === "stopped") {
+    return engine ? `Playback interrupted (${engine})` : "Playback interrupted";
+  }
+
+  return engine ? `Finished speaking (${engine})` : "Finished speaking";
+}
+
 export default function Command() {
   const [text, setText] = useState("");
   const [isInitializing, setIsInitializing] = useState(true);
@@ -56,10 +64,10 @@ export default function Command() {
 
     try {
       const { audio, format, engine } = await speak(text);
-      const { warnings } = await play(audio, format);
+      const { warnings, completion } = await play(audio, format);
       await showToast({
         style: Toast.Style.Success,
-        title: engine ? `Finished speaking (${engine})` : "Finished speaking",
+        title: getCompletionTitle(completion, engine),
         message: warnings.length > 0 ? warnings.join("; ") : undefined,
       });
       pop();

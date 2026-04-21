@@ -24,6 +24,7 @@ The built-in Mac and Chrome voices are still stuck in the uncanny valley, so I b
 * **Voice Control** – Pass a voice name to the server via preferences.
 * **Speed & Format Options** – Adjust playback speed and output format (requires ffmpeg for non-WAV or speed changes).
 * **Audio File Management** – Option to save generated audio files to `~/.cache/raycast-tts/` for debugging and reuse.
+* **Playback Controls** – Stop the current audio from a dedicated Raycast command.
 * **Feedback** – Shows progress during generation and surfaces errors clearly.
 
 ---
@@ -37,6 +38,7 @@ Install from the Raycast Store by searching for "TTS Reader".
 * **"Get Started"** – Onboarding and configuration help
 * **"Read Selected Text"** – Immediately reads the selected text or clipboard content
 * **"Read Text with Editor"** – Opens text editor for reviewing and editing text before reading aloud
+* **"Stop Audio"** – Immediately stop the active playback
 
 ---
 
@@ -96,6 +98,7 @@ All changes are saved automatically and take effect immediately.
 1. **Select text** in any app — or — copy text to the clipboard.
 2. Open Raycast and run **"Read Selected Text"**.
 3. Audio generation begins and plays automatically.
+4. Use **"Stop Audio"** while playback is active.
 
 ### With Editor
 
@@ -107,6 +110,7 @@ All changes are saved automatically and take effect immediately.
 * Playback speed from 0.25x to 4.0x
 * Output as WAV, MP3, M4A, or FLAC (ffmpeg required for non-WAV)
 * Enable "Save Audio Files" to keep generated speech in `~/.cache/raycast-tts/`
+* Assign a hotkey to **"Stop Audio"** for quick interruption access
 
 ---
 

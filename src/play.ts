@@ -1,15 +1,19 @@
-import { spawn } from "child_process";
 import { mkdir, unlink, writeFile } from "fs/promises";
 import { homedir, tmpdir } from "os";
 import { join } from "path";
+import { spawn } from "child_process";
 import { getPreferenceValues } from "@raycast/api";
 import { ensureToolingInPath } from "./path-utils";
+import { startPlayback } from "./playback-controller";
 import { Preferences } from "./types";
 
 const cleanupTimeouts = new Set<NodeJS.Timeout>();
 let ffmpegAvailableCache: boolean | null = null;
 
-export type PlayResult = { warnings: string[] };
+export type PlayResult = {
+  warnings: string[];
+  completion: "finished" | "stopped";
+};
 
 export async function play(audio: Buffer, sourceFormat: string): Promise<PlayResult> {
   const warnings: string[] = [];
@@ -61,14 +65,13 @@ export async function play(audio: Buffer, sourceFormat: string): Promise<PlayRes
   }
 
   try {
-    await playWithAfplay(playPath);
+    const completion = await startPlayback(playPath);
+    return { warnings, completion };
   } finally {
     if (!shouldSave) {
       scheduleCleanup(playPath);
     }
   }
-
-  return { warnings };
 }
 
 function createAudioPath({
@@ -173,31 +176,6 @@ function buildAtempoFilter(speed: number): string | null {
   }
 
   return filters.length > 0 ? filters.map((value) => `atempo=${value.toFixed(3)}`).join(",") : null;
-}
-
-async function playWithAfplay(filePath: string): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const afplay = spawn("afplay", ["-v", "1.0", filePath]);
-
-    let errorOutput = "";
-    afplay.stderr.on("data", (data) => {
-      errorOutput += data.toString();
-    });
-
-    afplay.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        const errorMessage = `afplay exited with code ${code}`;
-        const detailedError = errorOutput ? `${errorMessage}: ${errorOutput}` : errorMessage;
-        reject(new Error(detailedError));
-      }
-    });
-
-    afplay.on("error", (err) => {
-      reject(new Error(`afplay process error: ${err.message}`));
-    });
-  });
 }
 
 function scheduleCleanup(filePath: string): void {

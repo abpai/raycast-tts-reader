@@ -1,5 +1,15 @@
 # TTS Reader Changelog
 
+## [Unreleased]
+
+### Added
+
+- Stop Audio command for immediately ending the current playback
+
+### Changed
+
+- Playback now runs through a shared controller so one command can stop audio started by another command
+
 ## [2.1.0] - 2026-04-01
 
 **Gateway-aware transport and improved feedback.**
