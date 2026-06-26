@@ -1,6 +1,5 @@
 import { Action, ActionPanel, Form, showToast, Toast, useNavigation } from "@raycast/api";
 import { useEffect, useState } from "react";
-import { play } from "./play";
 import { getSelectedTextOrClipboard } from "./text-source";
 import { useTTS } from "./useTTS";
 
@@ -63,8 +62,7 @@ export default function Command() {
     }
 
     try {
-      const { audio, format, engine } = await speak(text);
-      const { warnings, completion } = await play(audio, format);
+      const { warnings, completion, engine } = await speak(text);
       await showToast({
         style: Toast.Style.Success,
         title: getCompletionTitle(completion, engine),

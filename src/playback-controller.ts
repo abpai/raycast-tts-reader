@@ -17,6 +17,139 @@ const systemPsPath = "/bin/ps";
 const spawnEnv = { ...process.env, PATH: ensureToolingInPath() };
 let preferredPlayerCache: PlaybackState["player"] | null = null;
 
+const STDIN_PLAYBACK_PATH = "stdin";
+
+export const DEFAULT_STDIN_FFPLAY_ARGS = ["-nodisp", "-autoexit", "-loglevel", "error", "-i", "-"];
+
+export async function isFfplayAvailable(): Promise<boolean> {
+  return await isCommandAvailable("ffplay");
+}
+
+export async function startStdinPlayback(
+  pump: (stdin: NodeJS.WritableStream, abortSignal: AbortSignal) => Promise<void>,
+  externalAbort?: AbortController,
+  ffplayArgs: string[] = DEFAULT_STDIN_FFPLAY_ARGS,
+): Promise<"finished" | "stopped"> {
+  await stopPlayback().catch(() => false);
+
+  const abortController = externalAbort ?? new AbortController();
+
+  return await new Promise<"finished" | "stopped">((resolve, reject) => {
+    const playbackProcess = spawn("ffplay", ffplayArgs, {
+      env: spawnEnv,
+      stdio: ["pipe", "ignore", "pipe"],
+    });
+    const pid = playbackProcess.pid;
+    const stdin = playbackProcess.stdin;
+
+    if (!pid || !stdin) {
+      playbackProcess.kill("SIGTERM");
+      reject(new Error("ffplay did not return a process id or stdin pipe"));
+      return;
+    }
+
+    let errorOutput = "";
+    let settled = false;
+    let statePersisted = false;
+
+    const stateWrite = writePlaybackState({
+      pid,
+      filePath: STDIN_PLAYBACK_PATH,
+      player: "ffplay",
+      status: "playing",
+    })
+      .then(() => {
+        statePersisted = true;
+      })
+      .catch(async (err) => {
+        abortController.abort();
+        try {
+          playbackProcess.kill("SIGTERM");
+        } catch {
+          // If the player already exited, the close/error handler will resolve the real outcome.
+        }
+        throw err;
+      });
+
+    const settle = (handler: () => void) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      abortController.abort();
+      void stateWrite
+        .catch(() => undefined)
+        .then(async () => {
+          if (statePersisted) {
+            await clearPlaybackState(pid);
+          }
+        })
+        .finally(handler);
+    };
+
+    playbackProcess.stderr.on("data", (data) => {
+      errorOutput += data.toString();
+    });
+
+    playbackProcess.on("close", (code, signal) => {
+      void readPlaybackState()
+        .catch(() => null)
+        .then((state) => {
+          const wasStopped = state?.pid === pid && state.status === "stopping";
+
+          settle(() => {
+            if (wasStopped) {
+              resolve("stopped");
+              return;
+            }
+
+            if (code === 0) {
+              resolve("finished");
+              return;
+            }
+
+            if (signal === "SIGTERM" || signal === "SIGKILL") {
+              resolve("stopped");
+              return;
+            }
+
+            const errorMessage = `ffplay exited with code ${code}`;
+            const detailedError = errorOutput ? `${errorMessage}: ${errorOutput}` : errorMessage;
+            reject(new Error(detailedError));
+          });
+        });
+    });
+
+    playbackProcess.on("error", (err) => {
+      settle(() => {
+        reject(new Error(`ffplay process error: ${err.message}`));
+      });
+    });
+
+    void stateWrite
+      .then(() =>
+        pump(stdin, abortController.signal).catch((err) => {
+          if (abortController.signal.aborted) {
+            return;
+          }
+          try {
+            playbackProcess.kill("SIGTERM");
+          } catch {
+            // The close/error handler will settle if the player already exited.
+          }
+          settle(() => {
+            reject(err instanceof Error ? err : new Error(String(err)));
+          });
+        }),
+      )
+      .catch((err) => {
+        settle(() => {
+          reject(new Error(`Failed to persist playback state: ${err.message}`));
+        });
+      });
+  });
+}
+
 export async function startPlayback(filePath: string): Promise<"finished" | "stopped"> {
   await stopPlayback().catch(() => false);
 

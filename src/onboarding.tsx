@@ -4,7 +4,7 @@ export default function Onboarding() {
   const markdown = `
   # Configuration
 
-  This extension reads text aloud using a local TTS server. It auto-detects [tts-gateway](https://github.com/abpai/tts-gateway) servers and uses their optimized \`/v1/speech\` endpoint. Any server that accepts \`POST /tts\` with a \`text\` form field also works.
+  This extension reads text aloud using a local TTS server. It auto-detects [tts-gateway](https://github.com/abpai/tts-gateway) servers and streams from \`/tts/stream/pcm\` when \`ffplay\` is available, then falls back to buffered \`/v1/speech\` playback when streaming is unavailable. Any server that accepts \`POST /tts\` with a \`text\` form field also works.
 
   **Recommended: tts-gateway**
   1. Install: \`uv tool install tts-gateway[kokoro]\`
@@ -20,7 +20,7 @@ export default function Onboarding() {
 
   Install \`ffmpeg\` to enable playback speed adjustment and audio format conversion. Without it, audio plays at the original speed and format returned by the server.
 
-  Install \`ffplay\` if you want playback to prefer FFmpeg's player instead of macOS \`afplay\`.
+  Install \`ffplay\` to enable low-latency tts-gateway streaming for normal-speed playback.
 
   **Playback controls**
 

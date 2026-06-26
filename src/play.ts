@@ -5,6 +5,7 @@ import { spawn } from "child_process";
 import { getPreferenceValues } from "@raycast/api";
 import { ensureToolingInPath } from "./path-utils";
 import { startPlayback } from "./playback-controller";
+import { parseSpeed } from "./playback-mode";
 import { Preferences } from "./types";
 
 const cleanupTimeouts = new Set<NodeJS.Timeout>();
@@ -85,14 +86,6 @@ function createAudioPath({
 }): string {
   const directory = useTemporaryDirectory ? tmpdir() : audioDir;
   return join(directory, `tts-${Date.now()}.${extension}`);
-}
-
-function parseSpeed(value?: string): number {
-  const parsed = Number(value ?? "1");
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return 1;
-  }
-  return Math.max(0.25, Math.min(4.0, parsed));
 }
 
 async function isFfmpegAvailable(): Promise<boolean> {

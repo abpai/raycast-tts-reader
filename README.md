@@ -4,7 +4,7 @@
 
 ![Extension Icon](./assets/extension-icon.png)
 
-*Turn any selected text into speech using any TTS provider, directly from Raycast.*
+_Turn any selected text into speech using any TTS provider, directly from Raycast._
 
 </div>
 
@@ -14,18 +14,18 @@
 
 I'm dyslexic (shoutout to fellow dyslexics! 👋), and I just wanted something that could read any text to me. Whether I'm browsing the web, in Slack, poking around Cursor agent chats, or anywhere else on my Mac.
 
-The built-in Mac and Chrome voices are still stuck in the uncanny valley, so I built this with the goal of high-quality local text-to-speech for *any* selected text, anywhere on your system—right from Raycast. Enjoy!
+The built-in Mac and Chrome voices are still stuck in the uncanny valley, so I built this with the goal of high-quality local text-to-speech for _any_ selected text, anywhere on your system—right from Raycast. Enjoy!
 
 ---
 
 ## Features
 
-* **Provider Agnostic** – Works with any TTS server that accepts `POST /tts` with a `text` form field.
-* **Voice Control** – Pass a voice name to the server via preferences.
-* **Speed & Format Options** – Adjust playback speed and output format (requires ffmpeg for non-WAV or speed changes).
-* **Audio File Management** – Option to save generated audio files to `~/.cache/raycast-tts/` for debugging and reuse.
-* **Playback Controls** – Stop the current audio from a dedicated Raycast command.
-* **Feedback** – Shows progress during generation and surfaces errors clearly.
+- **Provider Agnostic** – Works with any TTS server that accepts `POST /tts` with a `text` form field.
+- **Voice Control** – Pass a voice name to the server via preferences.
+- **Speed & Format Options** – Adjust playback speed and output format (requires ffmpeg for non-WAV or speed changes).
+- **Audio File Management** – Option to save generated audio files to `~/.cache/raycast-tts/` for debugging and reuse.
+- **Playback Controls** – Stop the current audio from a dedicated Raycast command.
+- **Feedback** – Shows progress during generation and surfaces errors clearly.
 
 ---
 
@@ -35,10 +35,10 @@ Install from the Raycast Store by searching for "TTS Reader".
 
 ### Commands Available
 
-* **"Get Started"** – Onboarding and configuration help
-* **"Read Selected Text"** – Immediately reads the selected text or clipboard content
-* **"Read Text with Editor"** – Opens text editor for reviewing and editing text before reading aloud
-* **"Stop Audio"** – Immediately stop the active playback
+- **"Get Started"** – Onboarding and configuration help
+- **"Read Selected Text"** – Immediately reads the selected text or clipboard content
+- **"Read Text with Editor"** – Opens text editor for reviewing and editing text before reading aloud
+- **"Stop Audio"** – Immediately stop the active playback
 
 ---
 
@@ -53,12 +53,15 @@ uv tool install tts-gateway[kokoro]
 tts serve --provider kokoro
 ```
 
-Any server that accepts `POST /tts` with a `text` form field and returns audio will work.
+The extension auto-detects tts-gateway servers and streams from
+`/tts/stream/pcm` when `ffplay` is available, then falls back to buffered
+`/v1/speech` playback when streaming endpoints are unavailable. Any server that
+accepts `POST /tts` with a `text` form field and returns audio will work.
 
 **Optional (speed/format)**
 
-* Install `ffmpeg` if you want non-WAV output or playback speed changes.
-* Install `ffplay` if you want the extension to prefer FFmpeg's playback engine instead of macOS `afplay`.
+- Install `ffmpeg` if you want non-WAV output or playback speed changes.
+- Install `ffplay` to enable low-latency tts-gateway streaming for normal-speed playback.
 
 ---
 
@@ -82,13 +85,13 @@ All changes are saved automatically and take effect immediately.
 
 ## Configuration Options
 
-| Preference          | Type / Default               | Description                                                        |
-| ------------------- | ---------------------------- | ------------------------------------------------------------------ |
-| `serverUrl`         | Text – `http://localhost:8000` | TTS server endpoint URL.                                         |
-| `voice`             | Text – empty                 | Voice name to pass to the TTS server.                              |
-| `speed`             | Text – `1.0`                 | Playback speed (0.25–4.0). Requires ffmpeg when not 1.0.           |
-| `outputFormat`      | Dropdown – `wav`             | Output format. Requires ffmpeg when not WAV.                       |
-| `saveAudioFiles`    | Checkbox – `false`           | Save generated audio files for debugging/reuse.                    |
+| Preference       | Type / Default                 | Description                                              |
+| ---------------- | ------------------------------ | -------------------------------------------------------- |
+| `serverUrl`      | Text – `http://localhost:8000` | TTS server endpoint URL.                                 |
+| `voice`          | Text – empty                   | Voice name to pass to the TTS server.                    |
+| `speed`          | Text – `1.0`                   | Playback speed (0.25–4.0). Requires ffmpeg when not 1.0. |
+| `outputFormat`   | Dropdown – `wav`               | Output format. Requires ffmpeg when not WAV.             |
+| `saveAudioFiles` | Checkbox – `false`             | Save generated audio files for debugging/reuse.          |
 
 ---
 
@@ -108,19 +111,19 @@ All changes are saved automatically and take effect immediately.
 
 ### More Options
 
-* Playback speed from 0.25x to 4.0x
-* Output as WAV, MP3, M4A, or FLAC (ffmpeg required for non-WAV)
-* Enable "Save Audio Files" to keep generated speech in `~/.cache/raycast-tts/`
-* Assign a hotkey to **"Stop Audio"** for quick interruption access
+- Playback speed from 0.25x to 4.0x
+- Output as WAV, MP3, M4A, or FLAC (ffmpeg required for non-WAV)
+- Enable "Save Audio Files" to keep generated speech in `~/.cache/raycast-tts/`
+- Assign a hotkey to **"Stop Audio"** for quick interruption access
 
 ---
 
 ## Audio File Management
 
-* By default, audio files are temporary and cleaned up after playback.
-* Enable "Save Audio Files" to keep them in `~/.cache/raycast-tts/`.
-* File extensions match your selected format.
-* Playback prefers `ffplay` when available and falls back to macOS `afplay`.
+- By default, audio files are temporary and cleaned up after playback.
+- Enable "Save Audio Files" to keep them in `~/.cache/raycast-tts/`.
+- File extensions match your selected format.
+- Buffered playback prefers `ffplay` when available and falls back to macOS `afplay`.
 
 ---
 

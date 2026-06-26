@@ -1,16 +1,17 @@
 import { getPreferenceValues } from "@raycast/api";
+import { DEFAULT_SERVER_URL, parseServerUrl } from "./server-url";
 import { Preferences } from "./types";
 
+export { parseServerUrl } from "./server-url";
 export type SpeechResult = {
   audio: Buffer;
   format: string;
   engine?: string;
 };
 
-const DEFAULT_SERVER_URL = "http://localhost:8000";
 const HEALTH_TIMEOUT_MS = 2000;
 
-let gatewayCache: { baseUrl: string; isGateway: boolean } | null = null;
+let positiveGatewayCache: { baseUrl: string } | null = null;
 
 export function getConfigError(preferences: Preferences): string | null {
   const serverUrl = preferences.serverUrl?.trim();
@@ -58,24 +59,9 @@ export async function createSpeech(text: string): Promise<SpeechResult> {
   return { audio: Buffer.from(audioBuffer), format, engine };
 }
 
-function parseServerUrl(rawUrl: string): { baseUrl: string; hasCustomPath: boolean; fullUrl: string } {
-  const trimmed = rawUrl.trim() || DEFAULT_SERVER_URL;
-
-  let url: URL;
-  try {
-    url = new URL(trimmed);
-  } catch {
-    throw new Error("Invalid TTS server URL");
-  }
-
-  const baseUrl = `${url.protocol}//${url.host}`;
-  const hasCustomPath = url.pathname !== "/" && url.pathname !== "";
-  return { baseUrl, hasCustomPath, fullUrl: url.toString() };
-}
-
-async function detectGateway(baseUrl: string): Promise<boolean> {
-  if (gatewayCache && gatewayCache.baseUrl === baseUrl) {
-    return gatewayCache.isGateway;
+export async function detectGateway(baseUrl: string): Promise<boolean> {
+  if (positiveGatewayCache?.baseUrl === baseUrl) {
+    return true;
   }
 
   let isGateway = false;
@@ -91,11 +77,13 @@ async function detectGateway(baseUrl: string): Promise<boolean> {
     // Health probe failed — not a gateway or server unreachable
   }
 
-  gatewayCache = { baseUrl, isGateway };
+  if (isGateway) {
+    positiveGatewayCache = { baseUrl };
+  }
   return isGateway;
 }
 
-function gatewayErrorMessage(status: number): string {
+export function gatewayErrorMessage(status: number): string {
   switch (status) {
     case 422:
       return "Text was empty";
@@ -108,6 +96,10 @@ function gatewayErrorMessage(status: number): string {
     default:
       return `TTS server error (${status})`;
   }
+}
+
+export function resetGatewayCacheForTests(): void {
+  positiveGatewayCache = null;
 }
 
 async function genericErrorMessage(response: Response): Promise<string> {

@@ -1,8 +1,11 @@
 import { showToast, Toast } from "@raycast/api";
 import { stopPlayback } from "./playback-controller";
+import { abortActiveStreamingRequest } from "./speak";
 
 export default async function Command() {
-  const stopped = await stopPlayback();
+  const abortedStream = await abortActiveStreamingRequest();
+  const stoppedPlayback = await stopPlayback();
+  const stopped = abortedStream || stoppedPlayback;
 
   await showToast({
     style: stopped ? Toast.Style.Success : Toast.Style.Failure,
