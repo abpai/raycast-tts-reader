@@ -1,17 +1,16 @@
 import { getPreferenceValues } from "@raycast/api";
 import { buildPcmFfplayArgs, parsePcmStreamHeaders } from "./pcm-stream";
 import { DEFAULT_STDIN_FFPLAY_ARGS, isFfplayAvailable, startStdinPlayback } from "./playback-controller";
-import { parseSpeed, resolvePlaybackMode } from "./playback-mode";
+import { parseSpeed, resolvePlaybackMode, shouldProbeFfplay } from "./playback-mode";
 import { play } from "./play";
 import { createSpeech, detectGateway, gatewayErrorMessage, getConfigError } from "./tts-utils";
 import { DEFAULT_SERVER_URL, parseServerUrl } from "./server-url";
 import {
-  clearStreamSession,
-  readStreamSession,
-  registerStreamSession,
-  requestStreamStop,
-  startStreamStopPolling,
-} from "./stream-stop";
+  beginStreamingSession,
+  endStreamingSession,
+  isActiveStreamingSession,
+  StreamingSession,
+} from "./stream-session";
 import { Preferences } from "./types";
 
 export type SpeakResult = {
@@ -24,16 +23,6 @@ const GATEWAY_PCM_STREAM_PATH = "/tts/stream/pcm";
 const GATEWAY_MP3_STREAM_PATH = "/tts/stream";
 const STREAM_UNAVAILABLE_WARNING = "Gateway streaming unavailable - buffered playback used";
 
-type ActiveStreamingSession = {
-  generation: number;
-  sessionId: string;
-  abortController: AbortController;
-  stopPolling: () => void;
-};
-
-let activeStreamingSession: ActiveStreamingSession | null = null;
-let nextStreamingGeneration = 0;
-
 export async function speakText(text: string): Promise<SpeakResult> {
   const preferences = getPreferenceValues<Preferences>();
   const configError = getConfigError(preferences);
@@ -45,8 +34,9 @@ export async function speakText(text: string): Promise<SpeakResult> {
   const isGateway = hasCustomPath ? false : await detectGateway(baseUrl);
   const speed = parseSpeed(preferences.speed);
   const saveAudioFiles = preferences.saveAudioFiles ?? false;
-  const shouldCheckFfplay = isGateway && !hasCustomPath && !saveAudioFiles && speed === 1;
-  const ffplayAvailable = shouldCheckFfplay ? await isFfplayAvailable() : false;
+  const ffplayAvailable = shouldProbeFfplay({ isGateway, hasCustomPath, saveAudioFiles, speed })
+    ? await isFfplayAvailable()
+    : false;
   const { mode, warnings } = resolvePlaybackMode({
     isGateway,
     hasCustomPath,
@@ -56,15 +46,12 @@ export async function speakText(text: string): Promise<SpeakResult> {
   });
 
   if (mode === "stream") {
-    try {
-      const result = await speakViaStream(text, baseUrl, preferences.voice?.trim());
-      return { ...result, warnings: [...warnings, ...result.warnings] };
-    } catch (error) {
-      if (!(error instanceof StreamUnavailableError)) {
-        throw error;
-      }
+    const result = await speakViaStream(text, baseUrl, preferences.voice?.trim());
+    if (result.kind === "fallback") {
       return await speakBuffered(text, [...warnings, STREAM_UNAVAILABLE_WARNING]);
     }
+
+    return { ...result.result, warnings: [...warnings, ...result.result.warnings] };
   }
 
   return await speakBuffered(text, warnings);
@@ -76,104 +63,60 @@ async function speakBuffered(text: string, warnings: string[]): Promise<SpeakRes
   return { warnings: [...warnings, ...result.warnings], completion: result.completion, engine };
 }
 
-export async function abortActiveStreamingRequest(): Promise<boolean> {
-  let stopped = false;
-
-  if (activeStreamingSession) {
-    activeStreamingSession.stopPolling();
-    activeStreamingSession.abortController.abort();
-    activeStreamingSession = null;
-    stopped = true;
-  }
-
-  try {
-    const session = await readStreamSession();
-    if (session) {
-      await requestStreamStop(session.sessionId);
-      stopped = true;
-    }
-  } catch {
-    // Missing or stale marker should be harmless.
-  }
-
-  return stopped;
-}
-
-export function resetActiveStreamingSessionForTests(): void {
-  activeStreamingSession = null;
-  nextStreamingGeneration = 0;
-}
-
-async function beginStreamingSession(): Promise<{
-  generation: number;
-  sessionId: string;
-  abortController: AbortController;
-  stopPolling: () => void;
-}> {
-  if (activeStreamingSession) {
-    activeStreamingSession.stopPolling();
-    activeStreamingSession.abortController.abort();
-  }
-
-  nextStreamingGeneration += 1;
-  const generation = nextStreamingGeneration;
-  const sessionId = await registerStreamSession();
-  const abortController = new AbortController();
-  const stopPolling = startStreamStopPolling(sessionId, abortController);
-  activeStreamingSession = { generation, sessionId, abortController, stopPolling };
-  return { generation, sessionId, abortController, stopPolling };
-}
-
-function endStreamingSession(generation: number, sessionId: string, stopPolling: () => void): void {
-  stopPolling();
-  if (activeStreamingSession?.generation === generation) {
-    activeStreamingSession = null;
-  }
-  void clearStreamSession(sessionId).catch(() => undefined);
-}
-
-function isActiveStreamingSession(generation: number): boolean {
-  return activeStreamingSession?.generation === generation;
-}
-
 function supersededStreamResult(): SpeakResult {
   return { warnings: [], completion: "stopped" };
 }
 
-async function speakViaStream(text: string, baseUrl: string, voice?: string): Promise<SpeakResult> {
-  const { generation, sessionId, abortController, stopPolling } = await beginStreamingSession();
+type StreamCascadeResult = { kind: "success"; result: SpeakResult } | { kind: "fallback" };
+
+async function speakViaStream(text: string, baseUrl: string, voice?: string): Promise<StreamCascadeResult> {
+  const session = await beginStreamingSession();
 
   try {
     const payload = buildStreamPayload(text, voice);
-    const pcmAttempt = await tryGatewayPcmStream(baseUrl, payload, abortController, generation);
-    if (pcmAttempt.kind === "success") {
-      return pcmAttempt.result;
-    }
-    if (pcmAttempt.kind === "superseded") {
-      return supersededStreamResult();
+    for (const format of GATEWAY_STREAM_FORMATS) {
+      if (!isActiveStreamingSession(session.generation)) {
+        return { kind: "success", result: supersededStreamResult() };
+      }
+
+      const attempt = await fetchGatewayStreamAttempt(baseUrl, payload, session, format);
+      if (attempt.kind === "success") {
+        return attempt;
+      }
+      if (attempt.kind === "superseded") {
+        return { kind: "success", result: supersededStreamResult() };
+      }
     }
 
-    if (!isActiveStreamingSession(generation)) {
-      return supersededStreamResult();
-    }
-
-    return await speakViaMp3Stream(baseUrl, payload, abortController, generation);
+    return { kind: "fallback" };
   } finally {
-    endStreamingSession(generation, sessionId, stopPolling);
+    endStreamingSession(session);
   }
 }
 
-type PcmStreamAttempt = { kind: "success"; result: SpeakResult } | { kind: "fallback" } | { kind: "superseded" };
+type StreamAttempt = { kind: "success"; result: SpeakResult } | { kind: "fallback" } | { kind: "superseded" };
+
+type GatewayStreamFormat = {
+  path: string;
+  ffplayArgsForResponse: (response: Response) => string[] | null;
+  emptyBodyIsFallback: boolean;
+};
+
+const GATEWAY_STREAM_FORMATS: GatewayStreamFormat[] = [
+  {
+    path: GATEWAY_PCM_STREAM_PATH,
+    ffplayArgsForResponse: pcmFfplayArgsForResponse,
+    emptyBodyIsFallback: true,
+  },
+  {
+    path: GATEWAY_MP3_STREAM_PATH,
+    ffplayArgsForResponse: () => DEFAULT_STDIN_FFPLAY_ARGS,
+    emptyBodyIsFallback: false,
+  },
+];
 
 function isStreamUnavailableStatus(status: number): boolean {
   return status === 404 || status === 405 || status === 501;
-}
-
-class StreamUnavailableError extends Error {
-  constructor(status: number) {
-    super(`Gateway streaming unavailable (${status})`);
-    this.name = "StreamUnavailableError";
-  }
 }
 
 function isFetchAborted(error: unknown, abortController: AbortController): boolean {
@@ -183,22 +126,22 @@ function isFetchAborted(error: unknown, abortController: AbortController): boole
   );
 }
 
-async function tryGatewayPcmStream(
+async function fetchGatewayStreamAttempt(
   baseUrl: string,
   payload: StreamPayload,
-  abortController: AbortController,
-  generation: number,
-): Promise<PcmStreamAttempt> {
+  session: StreamingSession,
+  format: GatewayStreamFormat,
+): Promise<StreamAttempt> {
   let response: Response;
   try {
-    response = await fetch(`${baseUrl}${GATEWAY_PCM_STREAM_PATH}`, {
+    response = await fetch(`${baseUrl}${format.path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      signal: abortController.signal,
+      signal: session.abortController.signal,
     });
   } catch (error) {
-    if (isFetchAborted(error, abortController)) {
+    if (isFetchAborted(error, session.abortController)) {
       return { kind: "superseded" };
     }
     throw error;
@@ -212,14 +155,17 @@ async function tryGatewayPcmStream(
     throw new Error(gatewayErrorMessage(response.status));
   }
 
-  const metadata = parsePcmStreamHeaders(response.headers);
   const body = response.body;
-  if (!metadata || !body) {
+  const ffplayArgs = format.ffplayArgsForResponse(response);
+  if (!body || !ffplayArgs) {
     await discardResponseBody(response);
-    return { kind: "fallback" };
+    if (format.emptyBodyIsFallback) {
+      return { kind: "fallback" };
+    }
+    throw new Error("TTS server returned empty stream");
   }
 
-  if (!isActiveStreamingSession(generation)) {
+  if (!isActiveStreamingSession(session.generation)) {
     await discardResponseBody(response);
     return { kind: "superseded" };
   }
@@ -229,8 +175,8 @@ async function tryGatewayPcmStream(
     async (stdin, abortSignal) => {
       await pumpReadableStream(body, stdin, abortSignal);
     },
-    abortController,
-    buildPcmFfplayArgs(metadata),
+    session.abortController,
+    ffplayArgs,
   );
 
   return {
@@ -239,55 +185,9 @@ async function tryGatewayPcmStream(
   };
 }
 
-async function speakViaMp3Stream(
-  baseUrl: string,
-  payload: StreamPayload,
-  abortController: AbortController,
-  generation: number,
-): Promise<SpeakResult> {
-  let response: Response;
-  try {
-    response = await fetch(`${baseUrl}${GATEWAY_MP3_STREAM_PATH}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: abortController.signal,
-    });
-  } catch (error) {
-    if (isFetchAborted(error, abortController)) {
-      return supersededStreamResult();
-    }
-    throw error;
-  }
-
-  if (!response.ok) {
-    await discardResponseBody(response);
-    if (isStreamUnavailableStatus(response.status)) {
-      throw new StreamUnavailableError(response.status);
-    }
-    throw new Error(gatewayErrorMessage(response.status));
-  }
-
-  if (!isActiveStreamingSession(generation)) {
-    await discardResponseBody(response);
-    return supersededStreamResult();
-  }
-
-  const engine = response.headers.get("x-tts-primary-engine") || undefined;
-  const body = response.body;
-  if (!body) {
-    throw new Error("TTS server returned empty stream");
-  }
-
-  const completion = await startStdinPlayback(
-    async (stdin, abortSignal) => {
-      await pumpReadableStream(body, stdin, abortSignal);
-    },
-    abortController,
-    DEFAULT_STDIN_FFPLAY_ARGS,
-  );
-
-  return { warnings: [], completion, engine };
+function pcmFfplayArgsForResponse(response: Response): string[] | null {
+  const metadata = parsePcmStreamHeaders(response.headers);
+  return metadata ? buildPcmFfplayArgs(metadata) : null;
 }
 
 type StreamPayload = { text: string; voice?: string };

@@ -6,10 +6,16 @@ export type PlaybackModeInput = {
   ffplayAvailable: boolean;
 };
 
+export type PlaybackModePrerequisitesInput = Omit<PlaybackModeInput, "ffplayAvailable">;
+
 export type PlaybackModeResult = {
   mode: "stream" | "buffered";
   warnings: string[];
 };
+
+export function shouldProbeFfplay(input: PlaybackModePrerequisitesInput): boolean {
+  return input.isGateway && !input.hasCustomPath && !input.saveAudioFiles && input.speed === 1;
+}
 
 export function resolvePlaybackMode(input: PlaybackModeInput): PlaybackModeResult {
   const warnings: string[] = [];
@@ -18,12 +24,12 @@ export function resolvePlaybackMode(input: PlaybackModeInput): PlaybackModeResul
     return { mode: "buffered", warnings };
   }
 
-  if (input.saveAudioFiles) {
-    warnings.push("Save audio requires buffered mode — streaming disabled");
-    return { mode: "buffered", warnings };
-  }
+  if (!shouldProbeFfplay(input)) {
+    if (input.saveAudioFiles) {
+      warnings.push("Save audio requires buffered mode — streaming disabled");
+      return { mode: "buffered", warnings };
+    }
 
-  if (input.speed !== 1) {
     warnings.push("Playback speed requires buffered mode — streaming disabled");
     return { mode: "buffered", warnings };
   }

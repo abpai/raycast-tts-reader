@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const abortActiveStreamingRequestMock = vi.fn();
-vi.mock("./speak", () => ({
+vi.mock("./stream-session", () => ({
   abortActiveStreamingRequest: (...args: unknown[]) => abortActiveStreamingRequestMock(...args),
 }));
 

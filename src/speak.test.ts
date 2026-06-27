@@ -279,7 +279,8 @@ describe("speakText gateway streaming", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const { speakText, abortActiveStreamingRequest } = await import("./speak");
+    const { speakText } = await import("./speak");
+    const { abortActiveStreamingRequest } = await import("./stream-session");
     const speakPromise = speakText("Hello");
 
     await fetchStarted;
@@ -297,7 +298,7 @@ describe("speakText gateway streaming", () => {
   it("writes a cross-process stop marker when abortActiveStreamingRequest finds a session file", async () => {
     readStreamSessionMock.mockResolvedValue({ sessionId: "session-remote" });
 
-    const { abortActiveStreamingRequest } = await import("./speak");
+    const { abortActiveStreamingRequest } = await import("./stream-session");
     await expect(abortActiveStreamingRequest()).resolves.toBe(true);
     expect(requestStreamStopMock).toHaveBeenCalledWith("session-remote");
   });

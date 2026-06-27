@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSpeed, resolvePlaybackMode } from "../src/playback-mode";
+import { parseSpeed, resolvePlaybackMode, shouldProbeFfplay } from "../src/playback-mode";
 
 describe("resolvePlaybackMode", () => {
   it("uses buffered mode for non-gateway servers", () => {
@@ -75,6 +75,28 @@ describe("resolvePlaybackMode", () => {
 
     expect(result.mode).toBe("buffered");
     expect(result.warnings).toContain("ffplay not found — streaming disabled");
+  });
+});
+
+describe("shouldProbeFfplay", () => {
+  it("matches the streaming prerequisites before probing ffplay", () => {
+    expect(
+      shouldProbeFfplay({
+        isGateway: true,
+        hasCustomPath: false,
+        saveAudioFiles: false,
+        speed: 1,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldProbeFfplay({
+        isGateway: true,
+        hasCustomPath: false,
+        saveAudioFiles: true,
+        speed: 1,
+      }),
+    ).toBe(false);
   });
 });
 
