@@ -2,14 +2,21 @@
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-06-27
+
+**Low-latency gateway streaming playback.**
+
 ### Added
 
 - Stop Audio command for immediately ending the current playback
+- Gateway streaming playback via PCM/MP3 routes when using a compatible `tts-gateway`
+- Cross-command stream cancellation for active gateway playback
 
 ### Changed
 
 - Playback now runs through a shared controller so one command can stop audio started by another command
 - Playback now prefers `ffplay` when it is available and falls back to macOS `afplay`
+- Gateway playback now falls back from PCM streaming to MP3 streaming to buffered speech
 
 ## [2.1.0] - 2026-04-01
 
