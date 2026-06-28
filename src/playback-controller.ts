@@ -11,13 +11,50 @@ export type PlaybackState = {
   status?: "playing" | "stopping";
 };
 
+type PlaybackCompletion = "finished" | "stopped";
+type PlaybackPump = (stdin: NodeJS.WritableStream, abortSignal: AbortSignal) => Promise<void>;
+
+type PlaybackProcessOptions = {
+  player: PlaybackState["player"];
+  args: string[];
+  filePath: string;
+  pump?: PlaybackPump;
+  externalAbort?: AbortController;
+  missingProcessMessage: string;
+};
+
 const audioDir = join(homedir(), ".cache", "raycast-tts");
 const playbackStatePath = join(audioDir, "playback-state.json");
 const systemPsPath = "/bin/ps";
 const spawnEnv = { ...process.env, PATH: ensureToolingInPath() };
 let preferredPlayerCache: PlaybackState["player"] | null = null;
 
-export async function startPlayback(filePath: string): Promise<"finished" | "stopped"> {
+const STDIN_PLAYBACK_PATH = "stdin";
+
+export const DEFAULT_STDIN_FFPLAY_ARGS = ["-nodisp", "-autoexit", "-loglevel", "error", "-i", "-"];
+
+export async function isFfplayAvailable(): Promise<boolean> {
+  return await isCommandAvailable("ffplay");
+}
+
+export async function startStdinPlayback(
+  pump: PlaybackPump,
+  externalAbort?: AbortController,
+  ffplayArgs: string[] = DEFAULT_STDIN_FFPLAY_ARGS,
+): Promise<PlaybackCompletion> {
+  await stopPlayback().catch(() => false);
+
+  return await runPlaybackProcess({
+    player: "ffplay",
+    args: ffplayArgs,
+    filePath: STDIN_PLAYBACK_PATH,
+    pump,
+    externalAbort,
+    missingProcessMessage: "ffplay did not return a process id or stdin pipe",
+  });
+}
+
+export async function startPlayback(filePath: string): Promise<PlaybackCompletion> {
   await stopPlayback().catch(() => false);
 
   const preferredPlayer = await getPreferredPlayer();
@@ -32,20 +69,30 @@ export async function startPlayback(filePath: string): Promise<"finished" | "sto
   }
 }
 
-async function startPlaybackWithPlayer(
-  filePath: string,
-  player: PlaybackState["player"],
-): Promise<"finished" | "stopped"> {
-  return await new Promise<"finished" | "stopped">((resolve, reject) => {
-    const playbackProcess = spawn(player, getPlaybackArgs(player, filePath), {
+async function startPlaybackWithPlayer(filePath: string, player: PlaybackState["player"]): Promise<PlaybackCompletion> {
+  return await runPlaybackProcess({
+    player,
+    args: getPlaybackArgs(player, filePath),
+    filePath,
+    missingProcessMessage: `${player} did not return a process id`,
+  });
+}
+
+async function runPlaybackProcess(options: PlaybackProcessOptions): Promise<PlaybackCompletion> {
+  const abortController = options.externalAbort ?? new AbortController();
+  const pump = options.pump;
+
+  return await new Promise<PlaybackCompletion>((resolve, reject) => {
+    const playbackProcess = spawn(options.player, options.args, {
       env: spawnEnv,
-      stdio: ["ignore", "ignore", "pipe"],
+      stdio: [pump ? "pipe" : "ignore", "ignore", "pipe"],
     });
     const pid = playbackProcess.pid;
+    const stdin = playbackProcess.stdin;
 
-    if (!pid) {
+    if (!pid || (pump && !stdin)) {
       playbackProcess.kill("SIGTERM");
-      reject(new Error(`${player} did not return a process id`));
+      reject(new Error(options.missingProcessMessage));
       return;
     }
 
@@ -53,11 +100,17 @@ async function startPlaybackWithPlayer(
     let settled = false;
     let statePersisted = false;
 
-    const stateWrite = writePlaybackState({ pid, filePath, player, status: "playing" })
+    const stateWrite = writePlaybackState({
+      pid,
+      filePath: options.filePath,
+      player: options.player,
+      status: "playing",
+    })
       .then(() => {
         statePersisted = true;
       })
       .catch(async (err) => {
+        abortController.abort();
         try {
           playbackProcess.kill("SIGTERM");
         } catch {
@@ -71,6 +124,7 @@ async function startPlaybackWithPlayer(
         return;
       }
       settled = true;
+      abortController.abort();
       void stateWrite
         .catch(() => undefined)
         .then(async () => {
@@ -107,7 +161,7 @@ async function startPlaybackWithPlayer(
               return;
             }
 
-            const errorMessage = `${player} exited with code ${code}`;
+            const errorMessage = `${options.player} exited with code ${code}`;
             const detailedError = errorOutput ? `${errorMessage}: ${errorOutput}` : errorMessage;
             reject(new Error(detailedError));
           });
@@ -116,15 +170,40 @@ async function startPlaybackWithPlayer(
 
     playbackProcess.on("error", (err) => {
       settle(() => {
-        reject(new Error(`${player} process error: ${err.message}`));
+        reject(new Error(`${options.player} process error: ${err.message}`));
       });
     });
 
-    void stateWrite.catch((err) => {
-      settle(() => {
-        reject(new Error(`Failed to persist playback state: ${err.message}`));
+    if (!pump || !stdin) {
+      void stateWrite.catch((err) => {
+        settle(() => {
+          reject(new Error(`Failed to persist playback state: ${err.message}`));
+        });
       });
-    });
+      return;
+    }
+
+    void stateWrite
+      .then(() =>
+        pump(stdin, abortController.signal).catch((err) => {
+          if (abortController.signal.aborted) {
+            return;
+          }
+          try {
+            playbackProcess.kill("SIGTERM");
+          } catch {
+            // The close/error handler will settle if the player already exited.
+          }
+          settle(() => {
+            reject(err instanceof Error ? err : new Error(String(err)));
+          });
+        }),
+      )
+      .catch((err) => {
+        settle(() => {
+          reject(new Error(`Failed to persist playback state: ${err.message}`));
+        });
+      });
   });
 }
 

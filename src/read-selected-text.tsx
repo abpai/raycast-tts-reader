@@ -1,7 +1,7 @@
 import { closeMainWindow, getPreferenceValues, showToast, Toast } from "@raycast/api";
-import { play } from "./play";
+import { speakText } from "./speak";
 import { getSelectedTextOrClipboard } from "./text-source";
-import { createSpeech, getConfigError } from "./tts-utils";
+import { getConfigError } from "./tts-utils";
 import { Preferences } from "./types";
 
 function getCompletionTitle(completion: "finished" | "stopped", engine?: string): string {
@@ -45,8 +45,7 @@ export default async function Command() {
   try {
     await closeMainWindow();
 
-    const { audio, format, engine } = await createSpeech(text);
-    const { warnings, completion } = await play(audio, format);
+    const { warnings, completion, engine } = await speakText(text);
 
     toast.style = Toast.Style.Success;
     toast.title = getCompletionTitle(completion, engine);

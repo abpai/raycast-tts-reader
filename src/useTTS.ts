@@ -1,6 +1,7 @@
 import { getPreferenceValues } from "@raycast/api";
 import { useMemo, useState } from "react";
-import { createSpeech, getConfigError } from "./tts-utils";
+import { speakText } from "./speak";
+import { getConfigError } from "./tts-utils";
 import { Preferences } from "./types";
 
 export function useTTS() {
@@ -15,7 +16,7 @@ export function useTTS() {
   const speak = async (text: string) => {
     setIsLoading(true);
     try {
-      return await createSpeech(text);
+      return await speakText(text);
     } finally {
       setIsLoading(false);
     }
