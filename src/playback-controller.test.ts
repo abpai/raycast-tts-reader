@@ -79,10 +79,10 @@ describe("startStdinPlayback", () => {
       "error",
       "-f",
       "s16le",
-      "-ar",
+      "-sample_rate",
       "24000",
-      "-ac",
-      "1",
+      "-ch_layout",
+      "mono",
       "-i",
       "-",
     ];

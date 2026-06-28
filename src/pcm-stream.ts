@@ -57,11 +57,23 @@ export function buildPcmFfplayArgs(metadata: PcmStreamMetadata): string[] {
     "error",
     "-f",
     metadata.pcmFormat,
-    "-ar",
+    "-sample_rate",
     String(metadata.sampleRate),
-    "-ac",
-    String(metadata.channels),
+    "-ch_layout",
+    channelLayoutForCount(metadata.channels),
     "-i",
     "-",
   ];
+}
+
+function channelLayoutForCount(channels: number): string {
+  if (channels === 1) {
+    return "mono";
+  }
+
+  if (channels === 2) {
+    return "stereo";
+  }
+
+  return `${channels}c`;
 }

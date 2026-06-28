@@ -50,6 +50,29 @@ describe("buildPcmFfplayArgs", () => {
         sampleRate: 24000,
         channels: 1,
       }),
-    ).toEqual(["-nodisp", "-autoexit", "-loglevel", "error", "-f", "s16le", "-ar", "24000", "-ac", "1", "-i", "-"]);
+    ).toEqual([
+      "-nodisp",
+      "-autoexit",
+      "-loglevel",
+      "error",
+      "-f",
+      "s16le",
+      "-sample_rate",
+      "24000",
+      "-ch_layout",
+      "mono",
+      "-i",
+      "-",
+    ]);
+  });
+
+  it("uses stereo channel layout for two-channel PCM playback", () => {
+    expect(
+      buildPcmFfplayArgs({
+        pcmFormat: "s16le",
+        sampleRate: 48000,
+        channels: 2,
+      }),
+    ).toContain("stereo");
   });
 });

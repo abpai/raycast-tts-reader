@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-06-28
+
+### Fixed
+
+- Fixed PCM streaming playback with FFmpeg 8.1 by using raw-audio demuxer
+  options supported by current `ffplay` builds.
+
 ## [2.2.0] - 2026-06-27
 
 **Low-latency gateway streaming playback.**
