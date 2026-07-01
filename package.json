@@ -50,8 +50,8 @@
       "name": "serverUrl",
       "type": "textfield",
       "title": "Server URL",
-      "description": "TTS server endpoint URL (typically http://localhost:8000).",
-      "defaultValue": "http://localhost:8000",
+      "description": "TTS server endpoint URL (typically http://127.0.0.1:45123 for tts-gateway).",
+      "defaultValue": "http://127.0.0.1:45123",
       "required": false
     },
     {

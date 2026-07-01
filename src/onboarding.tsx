@@ -8,8 +8,8 @@ export default function Onboarding() {
 
   **Recommended: tts-gateway**
   1. Install: \`uv tool install tts-gateway[kokoro]\`
-  2. Start the server: \`tts serve --provider kokoro\`
-  3. Press \`⏎\` to open preferences and confirm the server URL (default: \`http://localhost:8000\`).
+  2. Start the server: \`tts serve --provider kokoro --host 127.0.0.1 --port 45123\`
+  3. Press \`⏎\` to open preferences and confirm the server URL (default: \`http://127.0.0.1:45123\`).
 
   **Using another TTS server**
   1. Start your TTS server.

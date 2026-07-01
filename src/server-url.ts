@@ -1,4 +1,4 @@
-const DEFAULT_SERVER_URL = "http://localhost:8000";
+const DEFAULT_SERVER_URL = "http://127.0.0.1:45123";
 
 export function parseServerUrl(rawUrl: string): { baseUrl: string; hasCustomPath: boolean; fullUrl: string } {
   const trimmed = rawUrl.trim() || DEFAULT_SERVER_URL;

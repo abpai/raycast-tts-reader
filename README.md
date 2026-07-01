@@ -50,7 +50,7 @@ You need a running TTS server. A recommended example is [tts-gateway](https://gi
 
 ```bash
 uv tool install tts-gateway[kokoro]
-tts serve --provider kokoro
+tts serve --provider kokoro --host 127.0.0.1 --port 45123
 ```
 
 The extension auto-detects tts-gateway servers and streams from
@@ -87,7 +87,7 @@ All changes are saved automatically and take effect immediately.
 
 | Preference       | Type / Default                 | Description                                              |
 | ---------------- | ------------------------------ | -------------------------------------------------------- |
-| `serverUrl`      | Text – `http://localhost:8000` | TTS server endpoint URL.                                 |
+| `serverUrl`      | Text – `http://127.0.0.1:45123` | TTS server endpoint URL.                                |
 | `voice`          | Text – empty                   | Voice name to pass to the TTS server.                    |
 | `speed`          | Text – `1.0`                   | Playback speed (0.25–4.0). Requires ffmpeg when not 1.0. |
 | `outputFormat`   | Dropdown – `wav`               | Output format. Requires ffmpeg when not WAV.             |
@@ -132,7 +132,7 @@ All changes are saved automatically and take effect immediately.
 ### Server Connection Errors
 
 1. Confirm your TTS server is running.
-2. Check the server URL in preferences (default: `http://localhost:8000`).
+2. Check the server URL in preferences (default: `http://127.0.0.1:45123`).
 
 ### Speed / Format Issues
 
