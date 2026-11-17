@@ -135,7 +135,7 @@ async function runPlaybackProcess(options: PlaybackProcessOptions): Promise<Play
         .finally(handler);
     };
 
-    playbackProcess.stderr.on("data", (data) => {
+    playbackProcess.stderr?.on("data", (data) => {
       errorOutput += data.toString();
     });
 

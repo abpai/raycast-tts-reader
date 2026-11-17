@@ -46,12 +46,27 @@ Install from the Raycast Store by searching for "TTS Reader".
 
 **TTS Server**
 
-You need a running TTS server. A recommended example is [tts-gateway](https://github.com/abpai/tts-gateway):
+You need a running TTS server. The recommended setup uses published
+[tts-gateway v1.3.1](https://github.com/abpai/tts-gateway/releases/tag/v1.3.1)
+with Tiny Voca on the CPU. Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
+and Git first, then run:
 
 ```bash
-uv tool install tts-gateway[kokoro]
-tts serve --provider kokoro --host 127.0.0.1 --port 45123
+uv tool install --force 'tts-gateway[tiny-voca]==1.3.1' \
+  --with 'git+https://github.com/n4ze3m/dizione@8cd889e4de7be6bd1dd2e6891344a0729fa14dd4'
+tts serve --provider tiny-voca --device cpu --format wav --host 127.0.0.1 --port 45123
 ```
+
+The gateway package comes from PyPI. The pinned Git dependency installs the
+Dizione phonemizer, which Tiny Voca also requires. First startup downloads about
+27 MB of model and phonemizer files; later starts can use the cached files offline.
+Tiny Voca speaks American English. In TTS Reader preferences, keep **Server URL**
+at `http://127.0.0.1:45123` and leave **Voice** blank for `F2`, or enter `F2` or `M2`.
+Replace any saved Kokoro voice name with one of these values.
+
+If a gateway is already running, stop it before starting this server, or update
+and restart its service with the command above. Installing a new version does
+not update an already running process.
 
 The extension auto-detects tts-gateway servers and streams from
 `/tts/stream/pcm` when `ffplay` is available, then falls back to buffered
